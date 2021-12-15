@@ -29,9 +29,14 @@ const {
     getDoc,
     setDoc,
 } = require('firebase/firestore');
-const { getAuth, createUserWithEmailAndPassword } = require('firebase/auth');
+const {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+} = require('firebase/auth');
 const { database } = require('firebase-admin');
 const e = require('express');
+const { object } = require('firebase-functions/v1/storage');
 //const firebase = require('firebase');
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth();
@@ -116,6 +121,25 @@ app.post('/scream', (request, response) => {
 //         })
 // });
 
+const isEmail = (email) => {
+    const regEx =
+        /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    if (email.match(regEx)) return true;
+    return false;
+};
+
+const isEmpty = (string) => {
+    if (string.trim() === '') return true;
+    else return false;
+};
+
+const checkPropsIsEmptyWithError = (obj, errorHandler, propName) => {
+    if (isEmpty(obj[propName])) {
+        errorHandler[propName] = 'Must not be empty';
+        return true;
+    } else return false;
+};
+
 app.post('/signup', (req, res) => {
     const newUser = {
         email: req.body.email,
@@ -123,8 +147,25 @@ app.post('/signup', (req, res) => {
         confirmPassword: req.body.confirmPassword,
         handle: req.body.handle,
     };
-    let token;
-    let userId;
+
+    let errors = {};
+
+    if (!checkPropsIsEmptyWithError(newUser, errors, 'email')) {
+        //if (isEmpty(newUser.email)) errors.email = 'Must not be empty';
+        /*else*/ if (!isEmail(newUser.email))
+            errors.email = 'Must be a valid email address';
+    }
+
+    checkPropsIsEmptyWithError(newUser, errors, 'password');
+    //if (isEmpty(newUser.password)) errors.password = 'Must not be empty';
+    if (newUser.confirmPassword !== newUser.password)
+        errors.confirmPassword = 'Passwords must match';
+    checkPropsIsEmptyWithError(newUser, errors, 'handle');
+    //if (isEmpty(newUser.handle)) errors.handle = 'Must not be empty';
+
+    if (Object.keys(errors).length > 0) return res.status(400).json(errors);
+
+    let token, userId;
     const user = doc(db, 'users', `${newUser.handle}`);
     getDoc(user)
         .then((doc) => {
@@ -168,6 +209,36 @@ app.post('/signup', (req, res) => {
             } else {
                 return res.status(500).json({ error: err.code });
             }
+        });
+});
+
+app.post('/login', (req, res) => {
+    const user = {
+        email: req.body.email,
+        password: req.body.password,
+    };
+
+    let errors = {};
+
+    checkPropsIsEmptyWithError(user, errors, 'email');
+    //if (isEmpty(user.email)) errors.email = 'Must not be empty';
+    checkPropsIsEmptyWithError(user, errors, 'password');
+    //if (isEmpty(user.password)) errors.password = 'Must not be empty';
+
+    if (Object.keys(errors).length > 0) return res.status(400).json(errors);
+
+    signInWithEmailAndPassword(auth, user.email, user.password)
+        .then((data) => {
+            return data.user.getIdToken();
+        })
+        .then((token) => {
+            return res.json({ token });
+        })
+        .catch((err) => {
+            console.error(err);
+            if (err.code === 'auth/wrong-password') {
+                return res.status(403).json({ general: 'Wrong password' });
+            } else return res.status(500).json({ error: err.code });
         });
 });
 
