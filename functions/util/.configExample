@@ -1,0 +1,9 @@
+module.exports = {
+    apiKey: 'key',
+    authDomain: 'domain',
+    projectId: 'project',
+    storageBucket: 'storage',
+    messagingSenderId: 'id',
+    appId: 'appId',
+    measurementId: 'id',
+};
