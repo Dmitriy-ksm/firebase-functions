@@ -5,7 +5,7 @@ const app = require('express')();
 // // https://firebase.google.com/docs/functions/write-firebase-functions
 
 const { getAllScreams, postOneScream } = require('./handlers/screams');
-const { signup, login } = require('./handlers/users');
+const { signup, login, uploadImage } = require('./handlers/users');
 const FBAuth = require('./util/FBAuth');
 
 //const firebase = require('firebase');
@@ -15,6 +15,8 @@ const FBAuth = require('./util/FBAuth');
 app.post('/signup', signup);
 
 app.post('/login', login);
+
+app.post('/user/image', FBAuth, uploadImage);
 
 //Scream routes
 app.get('/scream', getAllScreams);
