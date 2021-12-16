@@ -1,16 +1,26 @@
-const { db, admin } = require('../util/admin');
+const { db, admin, auth } = require('../util/admin');
 const config = require('../util/config');
-const { doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
 const {
-    getAuth,
+    doc,
+    getDoc,
+    getDocs,
+    query,
+    collection,
+    setDoc,
+    updateDoc,
+    where,
+} = require('firebase/firestore');
+const {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
 } = require('firebase/auth');
 
-const { validateSignupData, validateLoginData } = require('../util/validator');
+const {
+    validateSignupData,
+    validateLoginData,
+    reduceUserDetails,
+} = require('../util/validator');
 const { object } = require('firebase-functions/v1/storage');
-
-const auth = getAuth();
 
 exports.signup = (req, res) => {
     const newUser = {
@@ -145,4 +155,43 @@ exports.uploadImage = (req, res) => {
             });
     });
     busboy.end(req.rawBody);
+};
+
+exports.addUserDetails = (req, res) => {
+    let userDetails = reduceUserDetails(req.body);
+
+    updateDoc(doc(db, 'users', req.user.handle), userDetails)
+        .then(() => res.json({ message: 'Details added successfully' }))
+        .catch((err) => {
+            console.error(err);
+            return res.status(500).json({ error: err.code });
+        });
+};
+
+exports.getUser = (req, res) => {
+    let userData = {};
+    const user = doc(db, 'users', `${req.user.handle}`);
+    getDoc(user)
+        .then((doc) => {
+            if (doc.exists()) {
+                userData.credentials = doc.data();
+                return getDocs(
+                    query(
+                        collection(db, 'likes'),
+                        where('userHandle', '==', req.user.handle)
+                    )
+                );
+            }
+        })
+        .then((data) => {
+            userData.likes = [];
+            data.forEach((doc) => {
+                userData.likes.push(doc.data());
+            });
+            return res.json(userData);
+        })
+        .catch((err) => {
+            console.error(err);
+            return res.status(500).json({ error: err.code });
+        });
 };
